@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { useAuth } from '../context/auth-context';
+import { AuthSplashScreen } from './AuthSplashScreen';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -13,24 +14,26 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const { status } = useAuth();
   const router = useRouter();
 
-  console.log("status:", status);
+  const [minimumLoadingComplete, setMinimumLoadingComplete] =
+    useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinimumLoadingComplete(true);
+    }, 10000);
 
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
     }
   }, [status, router]);
 
-  
-
-  // if (status === 'loading') {
-  //   return (
-  //     <div className="flex h-screen items-center justify-center">
-  //       Loading...
-  //     </div>
-  //   );
-  // }
+  if (status === 'loading' || !minimumLoadingComplete) {
+    return <AuthSplashScreen />;
+  }
 
   if (status === 'unauthenticated') {
     return null;
