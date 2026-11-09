@@ -2,7 +2,7 @@ import { api } from "../axios";
 
 export interface AuthUser {
   id: string;
-  name: string;
+  name?: string;
   email: string;
   roleId: string;
   roleName: string;
@@ -25,6 +25,21 @@ export interface MeResponse {
   user: AuthUser;
 }
 
+export interface LogoutResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface ChangePasswordResponse {
+  success: boolean;
+  message: string;
+}
+
 export const authApi = {
   async login(payload: LoginPayload): Promise<LoginResponse> {
     const response = await api.post<LoginResponse>("/auth/login", payload);
@@ -36,8 +51,19 @@ export const authApi = {
     return response.data;
   },
 
-  async logout() {
+  async logout(): Promise<LogoutResponse> {
     const response = await api.post("/auth/logout");
+    return response.data;
+  },
+
+  // Patch /auth/change-password
+  async changePassword(
+    payload: ChangePasswordPayload,
+  ): Promise<ChangePasswordResponse> {
+    const response = await api.patch<ChangePasswordResponse>(
+      "auth/change-password",
+      payload,
+    );
     return response.data;
   },
 };
