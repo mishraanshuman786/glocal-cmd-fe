@@ -17,6 +17,10 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const [minimumLoadingComplete, setMinimumLoadingComplete] =
     useState(false);
 
+  const [hasAuthResolved, setHasAuthResolved] = useState(
+    status !== 'loading',
+  );
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setMinimumLoadingComplete(true);
@@ -26,12 +30,21 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, []);
 
   useEffect(() => {
+    if (status !== 'loading') {
+      setHasAuthResolved(true);
+    }
+  }, [status]);
+
+  useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
     }
   }, [status, router]);
 
-  if (status === 'loading' || !minimumLoadingComplete) {
+  const shouldShowSplashScreen =
+    !hasAuthResolved || !minimumLoadingComplete;
+
+  if (shouldShowSplashScreen) {
     return <AuthSplashScreen />;
   }
 
