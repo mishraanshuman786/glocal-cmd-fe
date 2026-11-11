@@ -1,22 +1,27 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
+import { useSyncExternalStore } from "react";
+import { useTheme } from "next-themes";
+
+const subscribe = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    subscribe,
+    getClientSnapshot,
+    getServerSnapshot,
+  );
 
   if (!mounted) return null;
 
-  const isDark = resolvedTheme === 'dark';
+  const isDark = resolvedTheme === "dark";
 
   function toggleTheme() {
-    setTheme(isDark ? 'light' : 'dark');
+    setTheme(isDark ? "light" : "dark");
   }
 
   return (
@@ -26,7 +31,7 @@ export function ThemeToggle() {
       aria-label="Toggle theme"
       className="flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
     >
-      {isDark ? '☀️' : '🌙'}
+      {isDark ? "☀️" : "🌙"}
     </button>
   );
 }

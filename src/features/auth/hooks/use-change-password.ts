@@ -20,7 +20,7 @@ export function useChangePassword() {
       return authApi.changePassword(payload);
     },
 
-    onSuccess: (response) => {
+    onSuccess: () => {
       // Backend has revoked all sessions.
       // Remove the current frontend authentication.
       clearAuth();

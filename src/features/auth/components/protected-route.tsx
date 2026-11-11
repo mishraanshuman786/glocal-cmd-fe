@@ -1,54 +1,36 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-import { useAuth } from '../context/auth-context';
-import { AuthSplashScreen } from './AuthSplashScreen';
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "../context/auth-context";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
 }
 
-export function ProtectedRoute({ children }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+}: ProtectedRouteProps) {
   const { status } = useAuth();
   const router = useRouter();
 
-  const [minimumLoadingComplete, setMinimumLoadingComplete] =
-    useState(false);
-
-  const [hasAuthResolved, setHasAuthResolved] = useState(
-    status !== 'loading',
-  );
-
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinimumLoadingComplete(true);
-    }, 10000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (status !== 'loading') {
-      setHasAuthResolved(true);
-    }
-  }, [status]);
-
-  useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
+    if (status === "unauthenticated") {
+      router.replace("/login");
     }
   }, [status, router]);
 
-  const shouldShowSplashScreen =
-    !hasAuthResolved || !minimumLoadingComplete;
-
-  if (shouldShowSplashScreen) {
-    return <AuthSplashScreen />;
+  if (status === "loading") {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-gray-600">
+          Checking authentication...
+        </p>
+      </div>
+    );
   }
 
-  if (status === 'unauthenticated') {
+  if (status === "unauthenticated") {
     return null;
   }
 
