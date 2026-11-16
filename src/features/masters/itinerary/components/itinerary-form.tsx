@@ -142,11 +142,13 @@ export function ItineraryForm({
     return {
       title: title.trim(),
       days: days.map((day, dayIndex) => ({
+        id: day.id,
         dayNumber: dayIndex + 1,
         title: day.title.trim(),
         activities: day.activities
           .filter((activity) => activity.title.trim())
           .map((activity, activityIndex) => ({
+            id: activity.id,
             title: activity.title.trim(),
             order: activityIndex + 1,
           })),

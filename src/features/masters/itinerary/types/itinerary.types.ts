@@ -1,13 +1,13 @@
 export type ItineraryStatus="ACTIVE"|"INACTIVE";
 
 export interface ItineraryActivity{
-    id?:string;
+    id:string;
     title:string;
     order:number;
 }
 
 export interface ItineraryDay {
-    id?:string;
+    id:string;
     dayNumber:number;
     title:string;
     activities:ItineraryActivity[];
