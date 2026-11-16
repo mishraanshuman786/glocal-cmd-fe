@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { ItineraryDayCard } from "./itinerary-day-card";
 import { ItinerarySummary } from "./itinerary-summary";
+import { useAutoScrollFocus } from "@/hooks/use-auto-scroll-focus";
 
 import type {
   ItineraryDay,
@@ -17,6 +18,7 @@ interface ItineraryFormProps {
   isSaving?: boolean;
 }
 
+// Temporary IDs are only for frontend state management
 function createId() {
   return crypto.randomUUID();
 }
@@ -36,10 +38,12 @@ export function ItineraryForm({
 }: ItineraryFormProps) {
   const router = useRouter();
 
-  // Empty itinerary title initially
-  const [title, setTitle] = useState("");
+  const { scrollTo } = useAutoScrollFocus({
+  behavior: "smooth",
+  block: "center",
+});
 
-  // No days or activities initially
+  const [title, setTitle] = useState("");
   const [days, setDays] = useState<ItineraryDay[]>([]);
 
   const totalActivities = useMemo(
@@ -84,24 +88,28 @@ export function ItineraryForm({
   }
 
   function addActivity(dayId: string) {
-    setDays((previous) =>
-      previous.map((day) => {
-        if (day.id !== dayId) return day;
+  const targetDay = days.find((day) => day.id === dayId);
+  if (!targetDay) return;
 
-        return {
-          ...day,
-          activities: [
-            ...day.activities,
-            {
-              id: createId(),
-              title: "",
-              order: day.activities.length + 1,
-            },
-          ],
-        };
-      }),
-    );
-  }
+  const newActivity = {
+    id: createId(),
+    title: "",
+    order: targetDay.activities.length + 1,
+  };
+
+  scrollTo("activity", newActivity.id);
+
+  setDays((previous) =>
+    previous.map((day) =>
+      day.id === dayId
+        ? {
+            ...day,
+            activities: [...day.activities, newActivity],
+          }
+        : day
+    )
+  );
+}
 
   function removeActivity(dayId: string, activityId: string) {
     setDays((previous) =>
@@ -120,12 +128,13 @@ export function ItineraryForm({
     );
   }
 
-  function addDay() {
-    setDays((previous) => [
-      ...previous,
-      createDay(previous.length + 1),
-    ]);
-  }
+ function addDay() {
+  const newDay = createDay(days.length + 1);
+
+  scrollTo("day", newDay.id);
+
+  setDays((previous) => [...previous, newDay]);
+}
 
   function removeDay(dayId: string) {
     setDays((previous) =>
@@ -138,17 +147,18 @@ export function ItineraryForm({
     );
   }
 
+  // Build API payload WITHOUT frontend IDs
   function createPayload(): CreateItineraryPayload {
     return {
       title: title.trim(),
+
       days: days.map((day, dayIndex) => ({
-        id: day.id,
         dayNumber: dayIndex + 1,
         title: day.title.trim(),
+
         activities: day.activities
           .filter((activity) => activity.title.trim())
           .map((activity, activityIndex) => ({
-            id: activity.id,
             title: activity.title.trim(),
             order: activityIndex + 1,
           })),
@@ -268,6 +278,7 @@ export function ItineraryForm({
               <p className="text-base font-semibold text-[#263746]">
                 No days added yet
               </p>
+
               <p className="mt-1 text-sm text-[#718096]">
                 Start building your itinerary by adding your first day.
               </p>

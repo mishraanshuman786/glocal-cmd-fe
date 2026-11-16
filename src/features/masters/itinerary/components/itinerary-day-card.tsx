@@ -13,7 +13,7 @@ interface ItineraryDayCardProps{
 export function ItineraryDayCard({
     day,onTitleChange,onActivityChange,onAddActivity,onRemoveActivity,onRemoveDay
 }:ItineraryDayCardProps){
-   return ( <section className="flex overflow-hidden rounded-2xl border border-[#0d9e4ef] bg-white shadow-sm">
+   return ( <section data-scroll-type="day" data-scroll-id={day.id} className="flex overflow-hidden rounded-2xl border border-[#0d9e4ef] bg-white shadow-sm">
         {/* Day Label */}
         <div className="flex w-12 shrink-0 items-center justify-center bg-gradient-to-b from-[#168dcc] to-[#0874b5] sm:w-12">
             <span className="text-sm font-bold tracking-wide text-white"
@@ -29,6 +29,7 @@ export function ItineraryDayCard({
             {/* Day Title */}
             <div className="flex items-center gap-2">
                 <input 
+                    data-scroll-focus
                     value={day.title}
                     onChange={(event)=>onTitleChange(day.id,event.target.value)}
                     placeholder={`Day ${day.dayNumber} title`}
@@ -54,6 +55,8 @@ export function ItineraryDayCard({
           {day.activities.map((activity: ItineraryActivity) => (
             <div
               key={activity.id}
+               data-scroll-type="activity"
+               data-scroll-id={activity.id}
               className="flex min-w-0 items-center gap-2"
             >
               <span
@@ -64,6 +67,7 @@ export function ItineraryDayCard({
               </span>
 
               <input
+                data-scroll-focus
                 value={activity.title}
                 onChange={(event) =>
                   onActivityChange(

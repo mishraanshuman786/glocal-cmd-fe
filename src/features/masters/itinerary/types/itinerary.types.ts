@@ -1,36 +1,61 @@
-export type ItineraryStatus="ACTIVE"|"INACTIVE";
 
-export interface ItineraryActivity{
-    id:string;
-    title:string;
-    order:number;
+export type ItineraryStatus = "ACTIVE" | "INACTIVE";
+
+// ============================================
+// Backend response types (IDs included)
+// ============================================
+
+export interface ItineraryActivity {
+  id: string;
+  title: string;
+  order: number;
 }
 
 export interface ItineraryDay {
-    id:string;
-    dayNumber:number;
-    title:string;
-    activities:ItineraryActivity[];
+  id: string;
+  dayNumber: number;
+  title: string;
+  activities: ItineraryActivity[];
 }
 
+// ============================================
+// Create request types (NO IDs)
+// ============================================
 
-export interface CreateItineraryPayload{
-    title:string;
-    days:ItineraryDay[];
-    };
-
-
-export interface UpdateItineraryStatusRequest{
-    status:"ACTIVE"|"INACTIVE";
+export interface CreateItineraryActivity {
+  title: string;
+  order: number;
 }
+
+export interface CreateItineraryDay {
+  dayNumber: number;
+  title: string;
+  activities: CreateItineraryActivity[];
+}
+
+export interface CreateItineraryPayload {
+  title: string;
+  days: CreateItineraryDay[];
+}
+
+// ============================================
+// Update request types
+// ============================================
+
+export interface UpdateItineraryStatusRequest {
+  status: ItineraryStatus;
+}
+
+// ============================================
+// List response types
+// ============================================
 
 export interface ItineraryListItem {
   id: string;
   title: string;
-  status: "ACTIVE" | "INACTIVE";
+  status: ItineraryStatus;
   createdAt: string;
   updatedAt: string;
-
   durationsDays: number;
   totalActivities: number;
 
@@ -59,10 +84,13 @@ export interface GetItinerariesParams {
   page?: number;
   limit?: number;
   search?: string;
-  status?: "ACTIVE" | "INACTIVE";
+  status?: ItineraryStatus;
 }
 
-// Itineray detail types
+// ============================================
+// Detail response types
+// ============================================
+
 export interface ItineraryDetails {
   id: string;
   title: string;
@@ -79,3 +107,6 @@ export interface ItineraryDetailsResponse {
   message: string;
   data: ItineraryDetails;
 }
+
+// Compatibility with existing mock imports, if needed
+export type Itinerary = ItineraryDetails;
