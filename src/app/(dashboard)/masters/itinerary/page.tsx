@@ -1,349 +1,623 @@
+
 "use client";
 
-import { useMemo, useState } from "react";
-import {
-  Copy,
-  FileUp,
-  Pencil,
-  Plus,
-  Search,
-  ChevronDown,
-} from "lucide-react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { ItineraryTabs } from "@/features/masters/itinerary/components/itinerary-tabs";
-import { mockItineraries } from "@/features/masters/itinerary/data/mock-itineraries";
-import type { Itinerary } from "@/features/masters/itinerary/types/itinerary.types";
-type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE" | "DRAFT";
+import { useItineraries } from "@/features/masters/itinerary/hooks/use-itineraries";
+import { useUpdateItineraryStatus } from "@/features/masters/itinerary/hooks/use-update-itinerary-status";
+import { useCopyItinerary } from "@/features/masters/itinerary/hooks/use-copy-itinerary";
+
+import type { ItineraryStatus } from "@/features/masters/itinerary/types/itinerary.types";
+
+import { CustomSelect } from "@/components/ui/custom-select";
+import { TextInputModal } from "@/components/ui/text-input-modal";
+
+type StatusFilter = "ALL" | ItineraryStatus;
+
+const PAGE_SIZE = 4;
 
 export default function ItineraryPage() {
-  const [itineraries, setItineraries] =
-    useState<Itinerary[]>(mockItineraries);
-
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<StatusFilter>("ALL");
-
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const pageSize = 4;
+  const [selectedItinerary, setSelectedItinerary] = useState<{
+    id: string;
+    title: string;
+  } | null>(null);
 
-  const filteredItineraries = useMemo(() => {
-    return itineraries.filter((itinerary) => {
-      const matchesSearch = itinerary.title
-        .toLowerCase()
-        .includes(search.toLowerCase());
+  const queryParams = {
+    page: currentPage,
+    limit: PAGE_SIZE,
+    ...(search.trim() ? { search: search.trim() } : {}),
+    ...(statusFilter !== "ALL" ? { status: statusFilter } : {}),
+  };
 
-      const matchesStatus =
-        statusFilter === "ALL" ||
-        itinerary.status === statusFilter;
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isError,
+    error,
+    isPlaceholderData,
+  } = useItineraries(queryParams);
 
-      return matchesSearch && matchesStatus;
-    });
-  }, [itineraries, search, statusFilter]);
+  const statusMutation = useUpdateItineraryStatus();
+  const copyMutation = useCopyItinerary();
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredItineraries.length / pageSize),
-  );
+  const itineraries = data?.data ?? [];
+  const pagination = data?.pagination;
 
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-
-  const paginatedItineraries = filteredItineraries.slice(
-    (safeCurrentPage - 1) * pageSize,
-    safeCurrentPage * pageSize,
-  );
-
-  function handleToggle(id: string) {
-    setItineraries((previous) =>
-      previous.map((item) => {
-        if (item.id !== id) return item;
-
-        const isActive = !item.isActive;
-
-        return {
-          ...item,
-          isActive,
-          status: isActive ? "ACTIVE" : "INACTIVE",
-        };
-      }),
-    );
-  }
-
-  function handleCopy(itinerary: Itinerary) {
-    const copy: Itinerary = {
-      ...itinerary,
-      id: crypto.randomUUID(),
-      title: `${itinerary.title} (Copy)`,
-      isActive: false,
-      status: "DRAFT",
-      days: itinerary.days.map((day) => ({ ...day })),
-    };
-
-    setItineraries((previous) => [...previous, copy]);
-    setStatusFilter("ALL");
-    setSearch("");
-    setCurrentPage(
-      Math.ceil((itineraries.length + 1) / pageSize),
-    );
-  }
+  // If the current page becomes invalid after a deletion or filter change,
+  // move back to the last available page.
+  useEffect(() => {
+    if (
+      pagination &&
+      currentPage > pagination.totalPages &&
+      pagination.totalPages > 0
+    ) {
+      setCurrentPage(pagination.totalPages);
+    }
+  }, [pagination, currentPage]);
 
   function handleSearch(value: string) {
     setSearch(value);
     setCurrentPage(1);
   }
 
-  function handleStatusChange(value: StatusFilter) {
+  function handleStatusFilter(value: StatusFilter) {
     setStatusFilter(value);
     setCurrentPage(1);
   }
 
+  function isItineraryActive(status: ItineraryStatus) {
+    return status === "ACTIVE";
+  }
+
+  function handleStatusChange(
+    id: string,
+    currentStatus: ItineraryStatus,
+  ) {
+    const nextStatus: ItineraryStatus =
+      currentStatus === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+
+    statusMutation.mutate({
+      id,
+      status: {
+        status: nextStatus,
+      },
+    });
+  }
+
+  // Open the copy modal.
+  function handleCopy(id: string, title: string) {
+    copyMutation.reset();
+
+    setSelectedItinerary({
+      id,
+      title,
+    });
+  }
+
+  // Submit the new title and copy the itinerary.
+  async function handleConfirmCopy(newTitle: string) {
+    const title = newTitle.trim();
+
+    // Never make an API request with an empty title.
+    if (!selectedItinerary || !title) {
+      return;
+    }
+
+    try {
+      await copyMutation.mutateAsync({
+        id: selectedItinerary.id,
+        title,
+      });
+
+      // Close the modal only after successful copying.
+      setSelectedItinerary(null);
+    } catch {
+      // Keep the modal open so the user can retry.
+    }
+  }
+
+  function handleCloseCopyModal() {
+    if (copyMutation.isPending) return;
+
+    setSelectedItinerary(null);
+    copyMutation.reset();
+  }
+
+  const totalPages = pagination?.totalPages ?? 1;
+  const totalRecords = pagination?.total ?? 0;
+
+  if (isLoading && !data) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <p className="text-sm font-medium text-[#718096]">
+          Loading itineraries...
+        </p>
+      </div>
+    );
+  }
+
+  if (isError && !data) {
+    return (
+      <div className="rounded-2xl bg-white p-8 text-center shadow-sm">
+        <p className="text-red-500">
+          {error instanceof Error
+            ? error.message
+            : "Unable to load itineraries"}
+        </p>
+
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="mt-4 rounded-lg bg-[#0879bd] px-4 py-2 text-sm font-semibold text-white"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="mx-auto max-w-[1600px] space-y-6">
+    <div className="min-h-full space-y-5">
       {/* Page heading */}
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-[30px] font-bold leading-tight text-[#10243a]">
             Masters
           </h1>
-          <p className="text-sm text-[#64768b]">
+
+          <p className="text-sm text-[#718096]">
             Day-by-day plans that fill quotations automatically
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-medium text-[#263746] shadow-sm transition hover:bg-slate-50">
-            <FileUp size={17} />
-            Import from Word or PDF
-            <input
-              type="file"
-              accept=".doc,.docx,.pdf"
-              className="hidden"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                if (file) {
-                  alert(
-                    `Selected ${file.name}. Import processing will be implemented later.`,
-                  );
-                }
-                event.target.value = "";
-              }}
-            />
+          <input
+            type="file"
+            accept=".doc,.docx,.pdf"
+            className="hidden"
+            id="itinerary-import"
+            onChange={(event) =>
+              setSelectedFile(event.target.files?.[0] ?? null)
+            }
+          />
+
+          <label
+            htmlFor="itinerary-import"
+            title={selectedFile?.name ?? "Select a Word or PDF file"}
+            className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-5 py-3 text-sm font-medium text-[#263746] shadow-sm transition hover:bg-slate-50"
+          >
+            <span>⇧</span>
+            {selectedFile ? selectedFile.name : "Import from Word or PDF"}
           </label>
 
           <Link
             href="/masters/itinerary/new"
-            className="inline-flex items-center gap-2 rounded-xl bg-[#ff851b] px-5 py-3 text-sm font-semibold text-[#111827] shadow-sm transition hover:bg-[#f4770b]"
+            className="rounded-xl bg-[#ff851b] px-5 py-3 text-sm font-semibold text-[#111827] shadow-sm transition hover:bg-[#f4770b]"
           >
-            <Plus size={18} />
-            Add itinerary
+            + Add itinerary
           </Link>
         </div>
       </div>
 
-      {/* Master tabs */}
-      <ItineraryTabs />
+      {/* Master navigation */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          "State",
+          "District",
+          "Enquiry type",
+          "Enquiry category",
+          "Enquiry source",
+          "Package",
+          "Vehicle type",
+          "Meal plans",
+        ].map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            disabled
+            className="cursor-not-allowed rounded-full border border-white bg-white px-5 py-2.5 text-sm font-medium text-[#263746] shadow-sm opacity-90"
+          >
+            {tab}
+          </button>
+        ))}
 
-      {/* Itinerary table */}
-      <section className="overflow-hidden rounded-[20px] bg-white p-4 shadow-[0_8px_30px_rgba(31,54,78,0.07)] sm:p-5">
-        {/* Filters */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+        <span className="rounded-full bg-[#0879bd] px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
+          Itinerary
+        </span>
+      </div>
+
+      {/* Itinerary table container */}
+      <section className="overflow-hidden rounded-[20px] bg-white p-4 shadow-[0_8px_24px_rgba(15,39,66,0.06)] sm:p-5">
+        {/* Search and filter */}
+        <div className="mb-5 flex flex-col gap-2 sm:flex-row">
           <div className="relative w-full sm:max-w-[330px]">
-            <Search
-              size={18}
-              className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-            />
-
             <input
               type="text"
               value={search}
               onChange={(event) => handleSearch(event.target.value)}
               placeholder="Search itinerary title"
-              className="h-11 w-full rounded-xl border border-[#d5dfeb] bg-white pl-11 pr-4 text-sm text-[#24364a] outline-none transition placeholder:text-slate-400 focus:border-[#1682bd] focus:ring-2 focus:ring-blue-100"
+              className="h-11 w-full rounded-xl border border-[#d3dfeb] bg-white px-4 text-sm text-[#263746] outline-none transition placeholder:text-[#8b929b] focus:border-[#168dcc] focus:ring-2 focus:ring-blue-100"
             />
           </div>
 
-          <div className="relative w-full sm:w-[145px]">
-            <select
-              value={statusFilter}
-              onChange={(event) =>
-                handleStatusChange(event.target.value as StatusFilter)
-              }
-              className="h-11 w-full appearance-none rounded-full border border-[#d5dfeb] bg-white px-4 pr-10 text-sm text-[#24364a] shadow-sm outline-none focus:border-[#1682bd]"
-            >
-              <option value="ALL">All status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="DRAFT">Draft</option>
-            </select>
+          <CustomSelect
+            value={statusFilter}
+            onChange={(value) =>
+              handleStatusFilter(value as StatusFilter)
+            }
+            ariaLabel="Filter itineraries by status"
+            className="sm:w-[155px]"
+            options={[
+              { label: "All status", value: "ALL" },
+              { label: "Active", value: "ACTIVE" },
+              { label: "Inactive", value: "INACTIVE" },
+            ]}
+          />
+        </div>
 
-            <ChevronDown
-              size={16}
-              className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500"
-            />
+        {/* Background fetching indicator */}
+        {isFetching && (
+          <div className="mb-3 flex items-center gap-2 text-xs text-[#718096]">
+            <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#d3dfeb] border-t-[#0879bd]" />
+            Updating itineraries...
           </div>
-        </div>
+        )}
 
-        {/* Table header */}
-        <div className="hidden grid-cols-[1.2fr_0.6fr_1.8fr_0.55fr_0.55fr] gap-4 border-b border-[#e5ebf2] px-1 pb-4 text-[13px] font-medium uppercase text-[#718096] lg:grid">
-          <span>Itinerary</span>
-          <span>Duration</span>
-          <span>Day plan</span>
-          <span>Active</span>
-          <span>Actions</span>
-        </div>
+        {/* Fetch error while previous data is still visible */}
+        {isError && data && (
+          <p className="mb-3 text-sm text-red-500">
+            Unable to refresh itineraries. Showing the previous results.
+          </p>
+        )}
 
-        {/* Rows */}
-        <div>
-          {paginatedItineraries.map((itinerary) => (
-            <div
-              key={itinerary.id}
-              className="grid gap-4 border-b border-[#e8edf3] px-1 py-5 last:border-b-0 lg:grid-cols-[1.2fr_0.6fr_1.8fr_0.55fr_0.55fr] lg:items-center"
-            >
-              {/* Title */}
-              <div>
-                <p className="font-semibold text-[#10243a]">
-                  {itinerary.title}
-                </p>
-                <span className="mt-1 inline-block text-xs text-slate-500 lg:hidden">
+        {/* Desktop table */}
+        <div className="hidden overflow-x-auto md:block">
+          <table className="w-full min-w-[850px] table-fixed border-collapse">
+            <thead>
+              <tr className="border-b border-[#e4ebf2] text-left text-[13px] font-medium uppercase text-[#718096]">
+                <th className="w-[26%] px-1 pb-4 font-medium">
                   Itinerary
-                </span>
-              </div>
+                </th>
 
-              {/* Duration */}
-              <div>
-                <p className="font-semibold text-[#10243a]">
-                  {itinerary.duration}
-                </p>
-                <p className="text-sm text-[#718096]">
-                  {itinerary.activities} activities
-                </p>
-              </div>
+                <th className="w-[14%] px-2 pb-4 font-medium">
+                  Duration
+                </th>
 
-              {/* Day plan */}
-              <div className="space-y-1">
-                {itinerary.days.slice(0, 2).map((day) => (
-                  <div
-                    key={day.day}
-                    className="flex items-start gap-2 text-sm text-[#263746]"
-                  >
-                    <span className="shrink-0 rounded-md bg-[#dceaff] px-2 py-0.5 text-xs font-semibold text-[#2455b8]">
-                      Day {day.day}
-                    </span>
+                <th className="w-[38%] px-2 pb-4 font-medium">
+                  Day plan
+                </th>
 
-                    <span>{day.title}</span>
-                  </div>
-                ))}
-
-                {itinerary.days.length > 2 && (
-                  <p className="pl-[58px] text-sm text-[#718096]">
-                    +{itinerary.days.length - 2} more days
-                  </p>
-                )}
-              </div>
-
-              {/* Active toggle */}
-              <div className="flex items-center justify-between lg:justify-start">
-                <span className="text-sm text-slate-500 lg:hidden">
+                <th className="w-[12%] px-2 pb-4 text-center font-medium">
                   Active
-                </span>
+                </th>
 
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={itinerary.isActive}
-                  aria-label={`Toggle ${itinerary.title}`}
-                  onClick={() => handleToggle(itinerary.id)}
-                  className={`relative h-6 w-11 rounded-full transition-colors ${
-                    itinerary.isActive
-                      ? "bg-[#16a34a]"
-                      : "bg-slate-300"
-                  }`}
-                >
-                  <span
-                    className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow transition-transform ${
-                      itinerary.isActive
-                        ? "translate-x-6"
-                        : "translate-x-1"
-                    }`}
-                  />
-                </button>
-              </div>
+                <th className="w-[10%] px-2 pb-4" />
+              </tr>
+            </thead>
 
-              {/* Actions */}
-              <div className="flex items-center gap-4 text-sm">
-                <Link
-                  href={`/masters/itinerary/${itinerary.id}/edit`}
-                  className="inline-flex items-center gap-1 text-[#64768b] hover:text-[#0879bd]"
-                >
-                  <Pencil size={14} className="lg:hidden" />
-                  Edit
-                </Link>
+            <tbody>
+              {itineraries.map((item) => {
+                const active = isItineraryActive(item.status);
 
-                <button
-                  type="button"
-                  onClick={() => handleCopy(itinerary)}
-                  className="inline-flex items-center gap-1 text-[#64768b] hover:text-[#0879bd]"
-                >
-                  <Copy size={14} className="lg:hidden" />
-                  Copy
-                </button>
-              </div>
-            </div>
-          ))}
+                return (
+                  <tr
+                    key={item.id}
+                    className="border-b border-[#e4ebf2] last:border-b-0"
+                  >
+                    {/* Itinerary title */}
+                    <td className="px-1 py-5">
+                      <Link
+                        href={`/masters/itinerary/${item.id}`}
+                        className="font-bold text-[#10243a] transition hover:text-[#0879bd]"
+                      >
+                        {item.title}
+                      </Link>
+                    </td>
 
-          {paginatedItineraries.length === 0 && (
-            <div className="py-16 text-center">
-              <p className="font-semibold text-[#263746]">
-                No itineraries found
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Try changing your search or status filter.
-              </p>
-            </div>
-          )}
+                    {/* Duration */}
+                    <td className="px-2 py-5">
+                      <p className="font-bold text-[#10243a]">
+                        {item.durationsDays}{" "}
+                        {item.durationsDays === 1 ? "day" : "days"}
+                      </p>
+
+                      <p className="text-sm text-[#718096]">
+                        {item.totalActivities} activities
+                      </p>
+                    </td>
+
+                    {/* Day plan */}
+                    <td className="px-2 py-5">
+                      <div className="space-y-1">
+                        {item.days?.slice(0, 2).map((day) => (
+                          <div
+                            key={day.id}
+                            className="flex items-start gap-2"
+                          >
+                            <span className="shrink-0 rounded-md bg-[#dceaff] px-2 py-0.5 text-xs font-bold text-[#2457c5]">
+                              Day {day.dayNumber}
+                            </span>
+
+                            <span className="text-sm leading-5 text-[#263746]">
+                              {day.title}
+                            </span>
+                          </div>
+                        ))}
+
+                        {item.durationsDays > 2 && (
+                          <p className="text-sm text-[#718096]">
+                            +{item.durationsDays - 2} more days
+                          </p>
+                        )}
+
+                        {item.durationsDays === 0 && (
+                          <span className="text-sm text-[#a0aec0]">
+                            No day plans added
+                          </span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Active toggle */}
+                    <td className="px-2 py-5 text-center">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={active}
+                        aria-label={`Set ${item.title} ${
+                          active ? "inactive" : "active"
+                        }`}
+                        disabled={statusMutation.isPending}
+                        onClick={() =>
+                          handleStatusChange(item.id, item.status)
+                        }
+                        className={`relative inline-flex h-6 w-[43px] items-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                          active ? "bg-[#16a34a]" : "bg-[#cbd5e1]"
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-[18px] w-[18px] transform rounded-full bg-white shadow-sm transition ${
+                            active
+                              ? "translate-x-[22px]"
+                              : "translate-x-[3px]"
+                          }`}
+                        />
+                      </button>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="px-2 py-5 text-right whitespace-nowrap">
+                      <Link
+                        href={`/masters/itinerary/${item.id}`}
+                        className="text-sm text-[#718096] transition hover:text-[#0879bd]"
+                      >
+                        Edit
+                      </Link>
+
+                      <span className="px-1 text-[#a0aec0]">·</span>
+
+                      <button
+                        type="button"
+                        disabled={copyMutation.isPending}
+                        onClick={() =>
+                          handleCopy(item.id, item.title)
+                        }
+                        className="text-sm text-[#718096] transition hover:text-[#0879bd] disabled:opacity-50"
+                      >
+                        Copy
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
 
-        {/* Footer / pagination */}
-        <div className="flex flex-col justify-between gap-3 border-t border-[#e8edf3] pt-4 text-sm text-[#718096] sm:flex-row sm:items-center">
+        {/* Mobile cards */}
+        <div className="space-y-3 md:hidden">
+          {itineraries.map((item) => {
+            const active = isItineraryActive(item.status);
+
+            return (
+              <div
+                key={item.id}
+                className="rounded-xl border border-[#e4ebf2] p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <Link
+                      href={`/masters/itinerary/${item.id}`}
+                      className="font-bold text-[#10243a]"
+                    >
+                      {item.title}
+                    </Link>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={active}
+                    disabled={statusMutation.isPending}
+                    onClick={() =>
+                      handleStatusChange(item.id, item.status)
+                    }
+                    className={`relative inline-flex h-6 w-[43px] shrink-0 items-center rounded-full disabled:opacity-50 ${
+                      active ? "bg-[#16a34a]" : "bg-[#cbd5e1]"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-[18px] w-[18px] rounded-full bg-white transition ${
+                        active
+                          ? "translate-x-[22px]"
+                          : "translate-x-[3px]"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                <p className="mt-2 text-sm text-[#718096]">
+                  {item.durationsDays} days · {item.totalActivities} activities
+                </p>
+
+                <div className="mt-3 space-y-2">
+                  {item.days?.slice(0, 2).map((day) => (
+                    <p
+                      key={day.id}
+                      className="text-sm text-[#263746]"
+                    >
+                      <span className="mr-2 rounded-md bg-[#dceaff] px-2 py-0.5 text-xs font-bold text-[#2457c5]">
+                        Day {day.dayNumber}
+                      </span>
+                      {day.title}
+                    </p>
+                  ))}
+
+                  {item.durationsDays > 2 && (
+                    <p className="text-sm text-[#718096]">
+                      +{item.durationsDays - 2} more days
+                    </p>
+                  )}
+                </div>
+
+                <div className="mt-4 flex justify-end gap-3 border-t border-[#e4ebf2] pt-3">
+                  <Link
+                    href={`/masters/itinerary/${item.id}`}
+                    className="text-sm text-[#718096]"
+                  >
+                    Edit
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleCopy(item.id, item.title)
+                    }
+                    disabled={copyMutation.isPending}
+                    className="text-sm text-[#718096] disabled:opacity-50"
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Empty state */}
+        {itineraries.length === 0 && (
+          <div className="py-12 text-center">
+            <p className="font-semibold text-[#263746]">
+              No itineraries found
+            </p>
+
+            <p className="mt-1 text-sm text-[#718096]">
+              Try changing your search or status filter.
+            </p>
+          </div>
+        )}
+
+        {/* Pagination footer */}
+        <div className="mt-5 flex flex-col justify-between gap-3 border-t border-[#e4ebf2] pt-4 text-sm text-[#718096] sm:flex-row sm:items-center">
           <p>
             Showing{" "}
-            {filteredItineraries.length === 0
+            {totalRecords === 0
               ? 0
-              : (safeCurrentPage - 1) * pageSize + 1}
-            –
-            {Math.min(safeCurrentPage * pageSize, filteredItineraries.length)}{" "}
-            of {filteredItineraries.length} itineraries.
-            <span className="hidden sm:inline">
-              {" "}Imported itineraries are saved as drafts until you review them.
-            </span>
+              : (currentPage - 1) * PAGE_SIZE + 1}
+            {"–"}
+            {Math.min(currentPage * PAGE_SIZE, totalRecords)}
+            {" of "}
+            {totalRecords} itineraries
           </p>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
-              disabled={safeCurrentPage === 1}
-              onClick={() => setCurrentPage((page) => page - 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={
+                currentPage <= 1 || isFetching || isPlaceholderData
+              }
+              onClick={() =>
+                setCurrentPage((page) => Math.max(1, page - 1))
+              }
+              className="rounded-lg border border-[#d3dfeb] px-3 py-1.5 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Previous
             </button>
 
-            <span>
-              {safeCurrentPage} / {totalPages}
+            <span className="min-w-[65px] text-center">
+              {currentPage} / {totalPages}
             </span>
 
             <button
               type="button"
-              disabled={safeCurrentPage === totalPages}
-              onClick={() => setCurrentPage((page) => page + 1)}
-              className="rounded-lg border border-slate-200 px-3 py-1.5 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={
+                currentPage >= totalPages ||
+                isFetching ||
+                isPlaceholderData
+              }
+              onClick={() =>
+                setCurrentPage((page) =>
+                  Math.min(totalPages, page + 1),
+                )
+              }
+              className="rounded-lg border border-[#d3dfeb] px-3 py-1.5 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             >
               Next
             </button>
           </div>
         </div>
+
+        {/* Mutation feedback */}
+        {statusMutation.isError && (
+          <p className="mt-3 text-sm text-red-500">
+            Failed to update itinerary status. Please try again.
+          </p>
+        )}
+
+        {copyMutation.isError && (
+          <p className="mt-3 text-sm text-red-500">
+            Failed to copy itinerary. Please try again.
+          </p>
+        )}
+
+        {statusMutation.isSuccess && (
+          <p className="mt-3 text-sm text-green-600">
+            Itinerary status updated successfully.
+          </p>
+        )}
+
+        {copyMutation.isSuccess && (
+          <p className="mt-3 text-sm text-green-600">
+            Itinerary copied successfully.
+          </p>
+        )}
       </section>
+
+      {/* Copy itinerary modal */}
+      <TextInputModal
+        isOpen={selectedItinerary !== null}
+        title="Copy Itinerary"
+        description={
+          selectedItinerary
+            ? `Enter a new title for the copy of "${selectedItinerary.title}".`
+            : undefined
+        }
+        inputLabel="New itinerary title"
+        placeholder="Enter the new itinerary title"
+        initialValue=""
+        confirmText="OK"
+        cancelText="Cancel"
+        isLoading={copyMutation.isPending}
+        onConfirm={handleConfirmCopy}
+        onClose={handleCloseCopyModal}
+      />
     </div>
   );
 }

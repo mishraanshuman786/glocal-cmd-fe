@@ -1,33 +1,52 @@
-import Link from "next/link";
+'use client';
 
-export default async function EditItineraryPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+import { useParams } from 'next/navigation';
+import { useItinerary } from '@/features/masters/itinerary/hooks/use-itinerary';
+
+export default function ItineraryDetailsPage() {
+  const params = useParams<{ id: string }>();
+
+  const {
+    data,
+    isLoading,
+    isError,
+  } = useItinerary(params.id);
+
+  if (isLoading) {
+    return <p>Loading itinerary...</p>;
+  }
+
+  if (isError || !data) {
+    return <p>Unable to load itinerary.</p>;
+  }
+
+  // Adjust according to your actual API response.
+  const itinerary = data.data ?? data;
 
   return (
-    <div className="space-y-5">
-      <Link
-        href="/masters/itinerary"
-        className="text-sm text-[#0879bd] hover:underline"
-      >
-        ← Back to itineraries
-      </Link>
-
-      <h1 className="text-3xl font-bold text-[#10243a]">
-        Edit itinerary
+    <div className="space-y-6">
+      <h1 className="text-2xl font-semibold">
+        {itinerary.title}
       </h1>
 
-      <div className="rounded-2xl bg-white p-8 shadow-sm">
-        <p className="text-sm text-slate-600">
-          Editing itinerary: {id}
-        </p>
-        <p className="mt-2 text-sm text-slate-500">
-          The edit form will be implemented with the itinerary builder.
-        </p>
-      </div>
+      {itinerary.days?.map((day: any) => (
+        <section
+          key={day.id ?? day.dayNumber}
+          className="rounded-lg border p-4"
+        >
+          <h2 className="font-medium">
+            Day {day.dayNumber}: {day.title}
+          </h2>
+
+          <ul className="mt-3 list-disc pl-5">
+            {day.activities?.map((activity: any) => (
+              <li key={activity.id ?? activity.order}>
+                {activity.title}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useMemo, useState } from "react";
@@ -11,6 +12,11 @@ import type {
   CreateItineraryPayload,
 } from "../types/itinerary.types";
 
+interface ItineraryFormProps {
+  onSave: (payload: CreateItineraryPayload) => void;
+  isSaving?: boolean;
+}
+
 function createId() {
   return crypto.randomUUID();
 }
@@ -20,61 +26,21 @@ function createDay(dayNumber: number): ItineraryDay {
     id: createId(),
     dayNumber,
     title: "",
-    activities: [
-      {
-        id: createId(),
-        title: "",
-        order: 1,
-      },
-    ],
+    activities: [],
   };
 }
 
-export function ItineraryForm() {
+export function ItineraryForm({
+  onSave,
+  isSaving = false,
+}: ItineraryFormProps) {
   const router = useRouter();
 
-  const [title, setTitle] = useState("Goa Tour Package 3N/4D");
+  // Empty itinerary title initially
+  const [title, setTitle] = useState("");
 
-  const [days, setDays] = useState<ItineraryDay[]>([
-    {
-      id: createId(),
-      dayNumber: 1,
-      title: "Arrival in Goa",
-      activities: [
-        {
-          id: createId(),
-          title: "Arrive at airport and transfer to your hotel in North Goa",
-          order: 1,
-        },
-        {
-          id: createId(),
-          title:
-            "Check in, freshen up and spend the evening at Calangute or Baga beach",
-          order: 2,
-        },
-      ],
-    },
-    {
-      id: createId(),
-      dayNumber: 2,
-      title: "South Goa sightseeing",
-      activities: [
-        {
-          id: createId(),
-          title: "Visit Miramar Beach and the Old Goa churches",
-          order: 1,
-        },
-        {
-          id: createId(),
-          title:
-            "Explore a spice plantation, Dona Paula view point and Fontainhas",
-          order: 2,
-        },
-      ],
-    },
-  ]);
-
-  const [isSaving, setIsSaving] = useState(false);
+  // No days or activities initially
+  const [days, setDays] = useState<ItineraryDay[]>([]);
 
   const totalActivities = useMemo(
     () =>
@@ -85,7 +51,8 @@ export function ItineraryForm() {
     [days],
   );
 
-  const hasUnsavedChanges = true;
+  const hasUnsavedChanges =
+    title.trim().length > 0 || days.length > 0;
 
   function updateDayTitle(dayId: string, value: string) {
     setDays((previous) =>
@@ -187,7 +154,9 @@ export function ItineraryForm() {
     };
   }
 
-  async function handleSave() {
+  function handleSave() {
+    if (isSaving) return;
+
     if (!title.trim()) {
       alert("Please enter an itinerary title.");
       return;
@@ -210,20 +179,7 @@ export function ItineraryForm() {
       }
     }
 
-    const payload = createPayload();
-
-    setIsSaving(true);
-
-    try {
-      // API integration will replace this section.
-      console.log("Itinerary payload:", payload);
-
-      alert(
-        "The itinerary form is ready. API integration is the next step.",
-      );
-    } finally {
-      setIsSaving(false);
-    }
+    onSave(createPayload());
   }
 
   return (
@@ -249,8 +205,9 @@ export function ItineraryForm() {
         <div className="flex gap-2">
           <button
             type="button"
+            disabled={isSaving}
             onClick={() => router.push("/masters/itinerary")}
-            className="rounded-xl border border-[#d3dfeb] bg-white px-5 py-3 text-sm font-medium text-[#263746] hover:bg-slate-50"
+            className="rounded-xl border border-[#d3dfeb] bg-white px-5 py-3 text-sm font-medium text-[#263746] hover:bg-slate-50 disabled:opacity-60"
           >
             Cancel
           </button>
@@ -259,7 +216,7 @@ export function ItineraryForm() {
             type="button"
             disabled={isSaving}
             onClick={handleSave}
-            className="rounded-xl bg-[#ff851b] px-5 py-3 text-sm font-semibold text-[#111827] transition hover:bg-[#f4770b] disabled:opacity-60"
+            className="rounded-xl bg-[#ff851b] px-5 py-3 text-sm font-semibold text-[#111827] transition hover:bg-[#f4770b] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isSaving ? "Saving..." : "Save itinerary"}
           </button>
@@ -303,11 +260,24 @@ export function ItineraryForm() {
             ))}
           </div>
 
+          {/* Empty state */}
+          {days.length === 0 && (
+            <div className="rounded-2xl border border-dashed border-[#d3dfeb] bg-white px-5 py-10 text-center">
+              <p className="text-base font-semibold text-[#263746]">
+                No days added yet
+              </p>
+              <p className="mt-1 text-sm text-[#718096]">
+                Start building your itinerary by adding your first day.
+              </p>
+            </div>
+          )}
+
           {/* Add day */}
           <button
             type="button"
+            disabled={isSaving}
             onClick={addDay}
-            className="w-full rounded-2xl border-2 border-dashed border-[#83bce3] bg-[#f5faff] px-4 py-5 text-base font-bold text-[#0879bd] transition hover:bg-[#eaf5ff]"
+            className="w-full rounded-2xl border-2 border-dashed border-[#83bce3] bg-[#f5faff] px-4 py-5 text-base font-bold text-[#0879bd] transition hover:bg-[#eaf5ff] disabled:opacity-60"
           >
             + Add day
           </button>

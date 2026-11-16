@@ -28,7 +28,7 @@ export function DashboardShell({children}:{children:React.ReactNode}){
           </span>
         </header>
 
-        <main className="min-h-screen bg-blue-50 p-10">
+        <main className="min-h-screen bg-[#eaf1f8] p-10">
           {children}
         </main>
       </div>
