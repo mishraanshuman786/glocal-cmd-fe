@@ -58,7 +58,7 @@ const navGroups: NavGroup[] = [
   {
     label: "ADMIN",
     items: [
-      { label: "Masters", href: "/masters/itinerary", icon: Database },
+      { label: "Masters", href: "/masters/state", icon: Database },
       { label: "Users and Access", href: "/users-access", icon: ShieldCheck },
       { label: "Reports", href: "/reports", icon: BarChart3 },
       { label: "Settings", href: "/settings", icon: Settings },

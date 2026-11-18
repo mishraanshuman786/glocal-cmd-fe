@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -50,8 +49,6 @@ export default function ItineraryPage() {
   const itineraries = data?.data ?? [];
   const pagination = data?.pagination;
 
-  // If the current page becomes invalid after a deletion or filter change,
-  // move back to the last available page.
   useEffect(() => {
     if (
       pagination &&
@@ -72,10 +69,6 @@ export default function ItineraryPage() {
     setCurrentPage(1);
   }
 
-  function isItineraryActive(status: ItineraryStatus) {
-    return status === "ACTIVE";
-  }
-
   function handleStatusChange(
     id: string,
     currentStatus: ItineraryStatus,
@@ -91,24 +84,16 @@ export default function ItineraryPage() {
     });
   }
 
-  // Open the copy modal.
   function handleCopy(id: string, title: string) {
     copyMutation.reset();
 
-    setSelectedItinerary({
-      id,
-      title,
-    });
+    setSelectedItinerary({ id, title });
   }
 
-  // Submit the new title and copy the itinerary.
   async function handleConfirmCopy(newTitle: string) {
     const title = newTitle.trim();
 
-    // Never make an API request with an empty title.
-    if (!selectedItinerary || !title) {
-      return;
-    }
+    if (!selectedItinerary || !title) return;
 
     try {
       await copyMutation.mutateAsync({
@@ -116,7 +101,6 @@ export default function ItineraryPage() {
         title,
       });
 
-      // Close the modal only after successful copying.
       setSelectedItinerary(null);
     } catch {
       // Keep the modal open so the user can retry.
@@ -130,7 +114,7 @@ export default function ItineraryPage() {
     copyMutation.reset();
   }
 
-  const totalPages = pagination?.totalPages ?? 1;
+  const totalPages = Math.max(1, pagination?.totalPages ?? 1);
   const totalRecords = pagination?.total ?? 0;
 
   if (isLoading && !data) {
@@ -165,18 +149,8 @@ export default function ItineraryPage() {
 
   return (
     <div className="min-h-full space-y-5">
-      {/* Page heading */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-[30px] font-bold leading-tight text-[#10243a]">
-            Masters
-          </h1>
-
-          <p className="text-sm text-[#718096]">
-            Day-by-day plans that fill quotations automatically
-          </p>
-        </div>
-
+      {/* Page actions */}
+      <div className="flex flex-col justify-end gap-4 sm:flex-row sm:items-center">
         <div className="flex flex-wrap items-center gap-2">
           <input
             type="file"
@@ -194,7 +168,9 @@ export default function ItineraryPage() {
             className="flex cursor-pointer items-center gap-2 rounded-full border border-[#e2e8f0] bg-white px-5 py-3 text-sm font-medium text-[#263746] shadow-sm transition hover:bg-slate-50"
           >
             <span>⇧</span>
-            {selectedFile ? selectedFile.name : "Import from Word or PDF"}
+            {selectedFile
+              ? selectedFile.name
+              : "Import from Word or PDF"}
           </label>
 
           <Link
@@ -206,34 +182,7 @@ export default function ItineraryPage() {
         </div>
       </div>
 
-      {/* Master navigation */}
-      <div className="flex flex-wrap gap-2">
-        {[
-          "State",
-          "District",
-          "Enquiry type",
-          "Enquiry category",
-          "Enquiry source",
-          "Package",
-          "Vehicle type",
-          "Meal plans",
-        ].map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            disabled
-            className="cursor-not-allowed rounded-full border border-white bg-white px-5 py-2.5 text-sm font-medium text-[#263746] shadow-sm opacity-90"
-          >
-            {tab}
-          </button>
-        ))}
-
-        <span className="rounded-full bg-[#0879bd] px-5 py-2.5 text-sm font-semibold text-white shadow-sm">
-          Itinerary
-        </span>
-      </div>
-
-      {/* Itinerary table container */}
+      {/* Itinerary listing */}
       <section className="overflow-hidden rounded-[20px] bg-white p-4 shadow-[0_8px_24px_rgba(15,39,66,0.06)] sm:p-5">
         {/* Search and filter */}
         <div className="mb-5 flex flex-col gap-2 sm:flex-row">
@@ -262,7 +211,6 @@ export default function ItineraryPage() {
           />
         </div>
 
-        {/* Background fetching indicator */}
         {isFetching && (
           <div className="mb-3 flex items-center gap-2 text-xs text-[#718096]">
             <span className="h-3 w-3 animate-spin rounded-full border-2 border-[#d3dfeb] border-t-[#0879bd]" />
@@ -270,7 +218,6 @@ export default function ItineraryPage() {
           </div>
         )}
 
-        {/* Fetch error while previous data is still visible */}
         {isError && data && (
           <p className="mb-3 text-sm text-red-500">
             Unable to refresh itineraries. Showing the previous results.
@@ -285,33 +232,28 @@ export default function ItineraryPage() {
                 <th className="w-[26%] px-1 pb-4 font-medium">
                   Itinerary
                 </th>
-
                 <th className="w-[14%] px-2 pb-4 font-medium">
                   Duration
                 </th>
-
                 <th className="w-[38%] px-2 pb-4 font-medium">
                   Day plan
                 </th>
-
                 <th className="w-[12%] px-2 pb-4 text-center font-medium">
                   Active
                 </th>
-
                 <th className="w-[10%] px-2 pb-4" />
               </tr>
             </thead>
 
             <tbody>
               {itineraries.map((item) => {
-                const active = isItineraryActive(item.status);
+                const active = item.status === "ACTIVE";
 
                 return (
                   <tr
                     key={item.id}
                     className="border-b border-[#e4ebf2] last:border-b-0"
                   >
-                    {/* Itinerary title */}
                     <td className="px-1 py-5">
                       <Link
                         href={`/masters/itinerary/${item.id}`}
@@ -321,19 +263,16 @@ export default function ItineraryPage() {
                       </Link>
                     </td>
 
-                    {/* Duration */}
                     <td className="px-2 py-5">
                       <p className="font-bold text-[#10243a]">
                         {item.durationsDays}{" "}
                         {item.durationsDays === 1 ? "day" : "days"}
                       </p>
-
                       <p className="text-sm text-[#718096]">
                         {item.totalActivities} activities
                       </p>
                     </td>
 
-                    {/* Day plan */}
                     <td className="px-2 py-5">
                       <div className="space-y-1">
                         {item.days?.slice(0, 2).map((day) => (
@@ -344,7 +283,6 @@ export default function ItineraryPage() {
                             <span className="shrink-0 rounded-md bg-[#dceaff] px-2 py-0.5 text-xs font-bold text-[#2457c5]">
                               Day {day.dayNumber}
                             </span>
-
                             <span className="text-sm leading-5 text-[#263746]">
                               {day.title}
                             </span>
@@ -365,7 +303,6 @@ export default function ItineraryPage() {
                       </div>
                     </td>
 
-                    {/* Active toggle */}
                     <td className="px-2 py-5 text-center">
                       <button
                         type="button"
@@ -392,7 +329,6 @@ export default function ItineraryPage() {
                       </button>
                     </td>
 
-                    {/* Actions */}
                     <td className="px-2 py-5 text-right whitespace-nowrap">
                       <Link
                         href={`/masters/itinerary/${item.id}`}
@@ -424,7 +360,7 @@ export default function ItineraryPage() {
         {/* Mobile cards */}
         <div className="space-y-3 md:hidden">
           {itineraries.map((item) => {
-            const active = isItineraryActive(item.status);
+            const active = item.status === "ACTIVE";
 
             return (
               <div
@@ -432,19 +368,20 @@ export default function ItineraryPage() {
                 className="rounded-xl border border-[#e4ebf2] p-4"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <Link
-                      href={`/masters/itinerary/${item.id}`}
-                      className="font-bold text-[#10243a]"
-                    >
-                      {item.title}
-                    </Link>
-                  </div>
+                  <Link
+                    href={`/masters/itinerary/${item.id}`}
+                    className="font-bold text-[#10243a]"
+                  >
+                    {item.title}
+                  </Link>
 
                   <button
                     type="button"
                     role="switch"
                     aria-checked={active}
+                    aria-label={`Set ${item.title} ${
+                      active ? "inactive" : "active"
+                    }`}
                     disabled={statusMutation.isPending}
                     onClick={() =>
                       handleStatusChange(item.id, item.status)
@@ -517,14 +454,13 @@ export default function ItineraryPage() {
             <p className="font-semibold text-[#263746]">
               No itineraries found
             </p>
-
             <p className="mt-1 text-sm text-[#718096]">
               Try changing your search or status filter.
             </p>
           </div>
         )}
 
-        {/* Pagination footer */}
+        {/* Pagination */}
         <div className="mt-5 flex flex-col justify-between gap-3 border-t border-[#e4ebf2] pt-4 text-sm text-[#718096] sm:flex-row sm:items-center">
           <p>
             Showing{" "}
@@ -600,7 +536,7 @@ export default function ItineraryPage() {
         )}
       </section>
 
-      {/* Copy itinerary modal */}
+      {/* Copy modal */}
       <TextInputModal
         isOpen={selectedItinerary !== null}
         title="Copy Itinerary"
